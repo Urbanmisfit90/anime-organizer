@@ -8,40 +8,60 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: #ffffff; padding: 40px; max-width: 800px; margin: auto; }
         h1 { color: #bb86fc; border-bottom: 2px solid #333; padding-bottom: 10px; }
         .controls { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
-        select { padding: 12px; font-size: 16px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; flex-grow: 1; cursor: pointer; min-width: 200px; }
+        select, input { padding: 12px; font-size: 16px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; flex-grow: 1; min-width: 200px; }
         select:disabled { background: #222; color: #666; cursor: not-allowed; }
-        button { padding: 12px 24px; font-size: 16px; background: #03dac6; color: #000; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; transition: 0.2s; }
-        button:hover { background: #00b3a6; }
-        button:disabled { background: #555; color: #888; cursor: not-allowed; }
+        input { font-weight: bold; color: #bb86fc; width: 100%; box-sizing: border-box; }
+        
+        .btn-group { display: flex; gap: 10px; width: 100%; margin-top: 10px; }
+        button { padding: 12px 24px; font-size: 16px; color: #000; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; transition: 0.2s; flex: 1; }
+        button:disabled { background: #555 !important; color: #888 !important; cursor: not-allowed; }
+        .btn-run { background: #03dac6; }
+        .btn-run:hover { background: #00b3a6; }
+        .btn-missing { background: #ff9800; }
+        .btn-missing:hover { background: #e68a00; }
+
         #console-output { background: #000000; color: #00ff00; padding: 20px; margin-top: 25px; height: 400px; overflow-y: auto; font-family: 'Courier New', Courier, monospace; white-space: pre-wrap; border-radius: 6px; border: 1px solid #333; }
+        .help-text { font-size: 14px; color: #aaa; width: 100%; margin-top: 5px; margin-bottom: 10px; }
+        .row { display: flex; gap: 10px; width: 100%; }
     </style>
 </head>
 <body>
 
     <h1>🎬 Anime Organizer</h1>
-    <p>Select a show and an optional season folder to organize.</p>
+    <p>Select your show, verify the name, and organize!</p>
     
     <div class="controls">
-        <select id="main-folder-select" onchange="updateSubfolders()">
-            <option value="">Loading library...</option>
-        </select>
-        
-        <select id="sub-folder-select" disabled>
-            <option value="">(No subfolders)</option>
-        </select>
+        <div class="row">
+            <select id="main-folder-select" onchange="updateSubfolders()">
+                <option value="">Loading library...</option>
+            </select>
+            
+            <select id="sub-folder-select" disabled>
+                <option value="">(No subfolders)</option>
+            </select>
+        </div>
 
-        <button id="run-btn" onclick="startProcess()">Run Renamer</button>
+        <div class="row" style="flex-direction: column;">
+            <input type="text" id="search-input" placeholder="Official MyAnimeList Name or ID" />
+            <div class="help-text">↑ Edit this box to fix Japanese names (e.g., Niwatori Fighter) or paste the exact MyAnimeList ID!</div>
+        </div>
+    </div>
+
+    <div class="btn-group">
+        <button id="run-btn" class="btn-run" onclick="startProcess('/api/run-script')">✏️ Run Renamer</button>
+        <button id="missing-btn" class="btn-missing" onclick="startProcess('/api/missing-episodes')">🔍 Find Missing Episodes</button>
     </div>
 
     <div id="console-output">Ready...</div>
 
     <script>
-        let libraryData = {}; // Stores our dictionary of folders
+        let libraryData = {}; 
 
-        // When the page loads, fetch the structured list from the server
         window.onload = async function() {
             try {
-                const response = await fetch('/api/folders');
+                const timestamp = new Date().getTime();
+                const response = await fetch('/api/folders?nocache=' + timestamp);
+                
                 libraryData = await response.json();
                 const mainSelect = document.getElementById('main-folder-select');
                 const shows = Object.keys(libraryData);
@@ -52,71 +72,65 @@
                 }
 
                 mainSelect.innerHTML = '<option value="">-- Select a Show --</option>';
-                shows.forEach(show => {
-                    const option = document.createElement('option');
-                    option.value = show;
-                    option.textContent = show;
-                    mainSelect.appendChild(option);
-                });
+                shows.forEach(show => { mainSelect.appendChild(new Option(show, show)); });
             } catch (error) {
                 document.getElementById('console-output').innerHTML = "❌ Failed to load library folders.";
             }
         };
 
-        // Triggered every time you change the first dropdown
         function updateSubfolders() {
             const mainSelect = document.getElementById('main-folder-select');
             const subSelect = document.getElementById('sub-folder-select');
+            const searchInput = document.getElementById('search-input');
             const selectedShow = mainSelect.value;
 
-            subSelect.innerHTML = ''; // Clear out the old seasons
+            // Auto-fill the text box!
+            searchInput.value = selectedShow;
 
-            // If no show is selected, or the show has no folders inside it
-            if (!selectedShow || libraryData[selectedShow].length === 0) {
+            subSelect.innerHTML = ''; 
+
+            if (!selectedShow || !libraryData[selectedShow] || libraryData[selectedShow].length === 0) {
                 subSelect.innerHTML = '<option value="">(No subfolders)</option>';
                 subSelect.disabled = true;
                 return;
             }
 
-            // Populate the second dropdown with the specific subfolders
             subSelect.disabled = false;
-            subSelect.innerHTML = '<option value="">-- Main Folder --</option>'; // Allows targeting the root if needed
-            libraryData[selectedShow].forEach(sub => {
-                const option = document.createElement('option');
-                option.value = sub;
-                option.textContent = sub;
-                subSelect.appendChild(option);
-            });
+            subSelect.innerHTML = '<option value="">-- Main Folder --</option>'; 
+            libraryData[selectedShow].forEach(sub => { subSelect.appendChild(new Option(sub, sub)); });
         }
 
-        function startProcess() {
-            const mainSelect = document.getElementById('main-folder-select');
-            const subSelect = document.getElementById('sub-folder-select');
+function startProcess(apiEndpoint) {
+            const show = document.getElementById('main-folder-select').value;
+            const sub = document.getElementById('sub-folder-select').value;
+            const searchName = document.getElementById('search-input').value.trim();
             const outputDiv = document.getElementById('console-output');
             const runBtn = document.getElementById('run-btn');
+            const missingBtn = document.getElementById('missing-btn');
 
-            const show = mainSelect.value;
-            const sub = subSelect.value;
-
+            // THE FIX: Removed the lock! Now it only cares if you selected a folder.
             if (!show) {
                 alert("Please select a show first!");
                 return;
             }
 
-            // Combine them into a file path: "One Piece" OR "One Piece/Movies"
             const targetFolder = sub ? `${show}/${sub}` : show;
 
-            // Lock the button
             runBtn.disabled = true;
-            outputDiv.innerHTML = `Initializing script for: ${targetFolder}...\n=============================================\n`;
+            missingBtn.disabled = true;
+            
+            // Gives you a cleaner printout if you leave the box empty
+            let displaySearch = searchName ? `"${searchName}"` : "Auto-detecting from folder name...";
+            outputDiv.innerHTML = `Initializing script for: ${targetFolder}...\nSearching for: ${displaySearch}\n=============================================\n`;
 
-            const eventSource = new EventSource('/api/run-script?folder=' + encodeURIComponent(targetFolder));
+            const eventSource = new EventSource(`${apiEndpoint}?folder=${encodeURIComponent(targetFolder)}&searchName=${encodeURIComponent(searchName)}`);
 
             eventSource.onmessage = function(event) {
                 if (event.data === "[PROCESS_COMPLETE]") {
                     eventSource.close();
                     outputDiv.innerHTML += "\n✅ Connection Closed.";
-                    runBtn.disabled = false; // Unlock the button
+                    runBtn.disabled = false; 
+                    missingBtn.disabled = false;
                 } else {
                     outputDiv.innerHTML += event.data + "\n";
                     outputDiv.scrollTop = outputDiv.scrollHeight;
@@ -127,6 +141,7 @@
                 outputDiv.innerHTML += "\n❌ Connection lost.";
                 eventSource.close();
                 runBtn.disabled = false;
+                missingBtn.disabled = false;
             };
         }
     </script>
