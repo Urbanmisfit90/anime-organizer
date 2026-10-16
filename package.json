@@ -1,16 +1,18 @@
 {
   "name": "anime-organizer",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Local anime library organizer and missing episode scanner",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
+    "batch-scan": "node batch_missing_scanner.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Urbanmisfit90/anime-organizer.git"
   },
-  "keywords": [],
+  "keywords": ["anime", "organizer", "renamer"],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
@@ -19,7 +21,6 @@
   },
   "homepage": "https://github.com/Urbanmisfit90/anime-organizer#readme",
   "dependencies": {
-    "express": "^5.2.1",
-    "fuzzball": "^2.2.6"
+    "express": "^5.2.1"
   }
 }

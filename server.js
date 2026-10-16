@@ -57,7 +57,11 @@ app.get('/api/run-script', (req, res) => {
     const targetPath = path.join(BASE_DIR, folderName);
     const child = spawn('node', ['universal_renamer.js', targetPath, folderName, searchName]);
 
-    // THE FIX: Forces the server to split multiline chunks so the browser doesn't swallow them
+    // FIX: Kill child process if browser client disconnects early
+    req.on('close', () => {
+        if (!child.killed) child.kill();
+    });
+
     child.stdout.on('data', (data) => {
         const lines = data.toString().trim().split('\n');
         for (const line of lines) res.write(`data: ${line.trim()}\n\n`);
@@ -85,7 +89,11 @@ app.get('/api/missing-episodes', (req, res) => {
     const targetPath = path.join(BASE_DIR, targetFolder);
     const child = spawn('node', ['find_missing_anime.js', targetPath, targetFolder, searchName]);
 
-    // THE FIX: Forces the server to split multiline chunks so the browser doesn't swallow them
+    // FIX: Kill child process if browser client disconnects early
+    req.on('close', () => {
+        if (!child.killed) child.kill();
+    });
+
     child.stdout.on('data', (data) => {
         const lines = data.toString().trim().split('\n');
         for (const line of lines) res.write(`data: ${line.trim()}\n\n`);
